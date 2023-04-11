@@ -14,7 +14,7 @@ import project.SangHyun.domain.service.SignService;
 import project.SangHyun.web.dto.EmailAuthRequestDto;
 import project.SangHyun.web.dto.MemberLoginRequestDto;
 import project.SangHyun.web.dto.MemberRegisterRequestDto;
-import project.SangHyun.web.dto.TokenRequestDto;
+import project.SangHyun.web.dto.ReIssueRequestDto;
 
 @Slf4j
 @RestController
@@ -24,6 +24,7 @@ public class SignController {
 
     private final SignService signService;
     private final ResponseService responseService;
+
 
     @ApiOperation(value = "회원가입", notes = "회원가입을 진행한다.")
     @PostMapping("/register")
@@ -56,8 +57,8 @@ public class SignController {
 
     @ApiOperation(value = "토큰 재발급", notes = "Refresh Token을 통해 토큰을 재발급받는다.")
     @PostMapping("/reissue")
-    public SingleResult<TokenResponseDto> reIssue(@RequestBody TokenRequestDto tokenRequestDto) {
-        TokenResponseDto responseDto = signService.reIssue(tokenRequestDto);
+    public SingleResult<TokenResponseDto> reIssue(@RequestBody ReIssueRequestDto reIssueRequestDto) {
+        TokenResponseDto responseDto = signService.reIssue(reIssueRequestDto);
         return responseService.getSingleResult(responseDto);
     }
 }

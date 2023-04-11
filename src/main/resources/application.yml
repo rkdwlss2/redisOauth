@@ -1,6 +1,6 @@
 spring:
   jwt:
-    secretKey: vmfhwprxm
+    secretKey: ENC(10iIH2LN0y2SGVlbB/VcPvAsyzoApUsQ)
 
   jpa:
     show-sql: true
@@ -12,15 +12,15 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/project_db?serverTimezone=Asia/Seoul&charaterEncoding=UTF-8
-    username: user1
-    password: vmfhwprxm971223
+    url: jdbc:mysql://localhost:3306/email?serverTimezone=Asia/Seoul&charaterEncoding=UTF-8
+    username: ENC(gMwDI621L6EGjqIvpB128w==)
+    password: ENC(g9lQLGtfKAyQ8jxXFvNOJFLa2EpbsZbu)
 
   mail:
     host: smtp.gmail.com
     port: 587
-    username:
-    password:
+    username: ENC(8xgR3NorAjYdBqbU+FnTvAvOfo31zB9GMpSOa3Wzzy0=)
+    password: ENC(5hRxZvs9b9jShbygHa6BqPmsd+v39/PLy05zF2Fbo4Q=)
     properties:
       mail:
         smtp:
@@ -31,11 +31,13 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-
+  redis:
+    host: localhost
+    port: 6379
 
   social:
     kakao:
-      client_id:
+      client_id: ENC(yeVhoF0DlflZD54Kb42oA40K9A+RhP1b9+4zNxamTxQqlPvkhyPdTAkX6MNSU6AX)
       redirect: http://localhost:8080/social/login/kakao
       url:
         login: https://kauth.kakao.com/oauth/authorize
@@ -43,8 +45,8 @@ spring:
         profile: https://kapi.kakao.com/v2/user/me
 
     google:
-      client_id:
-      client_secret:
+      client_id: ENC(eYIwUx5jPrrMh+OAp95r3jJKiD772g80MzVI6g2aH8xoboIwv/f0vPBgEVIKkXeKyR7QjALxywM32zOSdvb2ziBad6bhTfMHab+b/P4quxO8f4VIPppJTA==)
+      client_secret: ENC(9n4mDmz2r1fuudqErhbWYaKZL9KhWQyJtA1Dm0Gnq1UiXkMfDv4yK3gkxw7eZ1Wj)
       redirect: http://localhost:8080/social/login/google
       url:
         login: https://accounts.google.com/o/oauth2/v2/auth
@@ -52,10 +54,18 @@ spring:
         profile: https://www.googleapis.com/oauth2/v3/userinfo
 
     naver:
-      client_id:
-      client_secret:
+      client_id: ENC(BJPSQBj4DSzuJJ8FHOu4Lu5VxsH5Ir+MF8BntCM7IJU=)
+      client_secret: ENC(mUDGz6Byuqp7AcsoHo9DhEF9rza9kiMf)
       redirect: http://localhost:8080/social/login/naver
       url:
         login: https://nid.naver.com/oauth2.0/authorize
         token: https://nid.naver.com/oauth2.0/token
         profile: https://openapi.naver.com/v1/nid/me
+# Jasypt
+jasypt:
+  encryptor:
+    bean: jasyptStringEncryptor
+    algorithm: PBEWithMD5AndDES
+    pool-size: 2
+    string-output-type: base64
+    key-obtention-iterations: 100000

@@ -23,7 +23,6 @@ public class Member {
     private String email;
     private String password;
     private String provider;
-    private String refreshToken;
     private Boolean emailAuth;
 
     @ElementCollection(fetch = FetchType.LAZY)
@@ -43,9 +42,6 @@ public class Member {
         this.roles.add(role);
     }
 
-    public void updateRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
-    }
 
     public void emailVerifiedSuccess() {
         this.emailAuth = true;

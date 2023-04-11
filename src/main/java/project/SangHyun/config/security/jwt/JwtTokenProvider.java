@@ -1,6 +1,7 @@
 package project.SangHyun.config.security.jwt;
 
 import io.jsonwebtoken.*;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +17,7 @@ import java.util.Base64;
 import java.util.Date;
 
 @Setter
+@Getter
 @Component
 @RequiredArgsConstructor
 public class JwtTokenProvider {
@@ -23,8 +25,8 @@ public class JwtTokenProvider {
     @Value("${spring.jwt.secretKey}")
     private String secretKey;
 
-    private long tokenValidTime = 1L; // 30분
-    private long refreshTokenValidTime = 1000L * 60 * 60 * 24 * 7; // 7일
+    public static final long tokenValidTime = 1L; // 30분
+    public static final long refreshTokenValidTime = 1000L * 60 * 60 * 24 * 7; // 7일
 
     private final UserDetailsService userDetailsService;
 

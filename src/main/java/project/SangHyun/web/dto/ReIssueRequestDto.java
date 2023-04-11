@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TokenRequestDto {
-    String accessToken;
+public class ReIssueRequestDto {
+    String email;
     String refreshToken;
 }

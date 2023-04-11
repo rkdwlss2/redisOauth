@@ -2,8 +2,6 @@ package project.SangHyun.domain.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,16 +12,14 @@ import project.SangHyun.domain.auth.Profile.ProfileDto;
 import project.SangHyun.domain.dto.MemberLoginResponseDto;
 import project.SangHyun.domain.dto.MemberRegisterResponseDto;
 import project.SangHyun.domain.dto.TokenResponseDto;
-import project.SangHyun.domain.entity.EmailAuth;
 import project.SangHyun.domain.entity.Member;
-import project.SangHyun.domain.repository.EmailAuthRepository;
+import project.SangHyun.domain.entity.RedisKey;
 import project.SangHyun.domain.repository.MemberRepository;
 import project.SangHyun.web.dto.EmailAuthRequestDto;
 import project.SangHyun.web.dto.MemberLoginRequestDto;
 import project.SangHyun.web.dto.MemberRegisterRequestDto;
-import project.SangHyun.web.dto.TokenRequestDto;
+import project.SangHyun.web.dto.ReIssueRequestDto;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,11 +33,11 @@ public class SignService {
     private final PasswordEncoder passwordEncoder;
 
     private final MemberRepository memberRepository;
-    private final EmailAuthRepository emailAuthRepository;
 
     private final ProviderService providerService;
     private final EmailService emailService;
 
+    private final RedisService redisService;
 
 
     /**
@@ -52,12 +48,8 @@ public class SignService {
     @Transactional
     public MemberRegisterResponseDto registerMember(MemberRegisterRequestDto requestDto) {
         validateDuplicated(requestDto.getEmail());
-        EmailAuth emailAuth = emailAuthRepository.save(
-                EmailAuth.builder()
-                        .email(requestDto.getEmail())
-                        .authToken(UUID.randomUUID().toString())
-                        .expired(false)
-                        .build());
+        String authToken = UUID.randomUUID().toString();
+        redisService.setDataWithExpiration(RedisKey.EAUTH.getKey()+requestDto.getEmail(),authToken,60*5L);
 
         Member member = memberRepository.save(
                 Member.builder()
@@ -67,11 +59,10 @@ public class SignService {
                         .emailAuth(false)
                         .build());
 
-        emailService.send(emailAuth.getEmail(), emailAuth.getAuthToken());
+        emailService.send(requestDto.getEmail(), authToken);
         return MemberRegisterResponseDto.builder()
                 .id(member.getId())
                 .email(member.getEmail())
-                .authToken(emailAuth.getAuthToken())
                 .build();
     }
 
@@ -86,10 +77,11 @@ public class SignService {
      */
     @Transactional
     public void confirmEmail(EmailAuthRequestDto requestDto) {
-        EmailAuth emailAuth = emailAuthRepository.findValidAuthByEmail(requestDto.getEmail(), requestDto.getAuthToken(), LocalDateTime.now())
-                .orElseThrow(EmailAuthTokenNotFountException::new);
+        if (redisService.getData(RedisKey.EAUTH.getKey())+requestDto.getEmail()==null){
+            throw new EmailAuthTokenNotFountException();
+        }
         Member member = memberRepository.findByEmail(requestDto.getEmail()).orElseThrow(MemberNotFoundException::new);
-        emailAuth.useToken();
+        redisService.deleteData(RedisKey.EAUTH.getKey()+requestDto.getEmail());
         member.emailVerifiedSuccess();
     }
 
@@ -105,8 +97,10 @@ public class SignService {
             throw new LoginFailureException();
         if (!member.getEmailAuth())
             throw new EmailNotAuthenticatedException();
-        member.updateRefreshToken(jwtTokenProvider.createRefreshToken());
-        return new MemberLoginResponseDto(member.getId(), jwtTokenProvider.createToken(requestDto.getEmail()), member.getRefreshToken());
+
+        String refreshToken = jwtTokenProvider.createRefreshToken();
+        redisService.setDataWithExpiration(RedisKey.REGISTER.getKey()+member.getEmail(),refreshToken,JwtTokenProvider.refreshTokenValidTime);
+        return new MemberLoginResponseDto(member.getId(),jwtTokenProvider.createToken(requestDto.getEmail()),refreshToken);
     }
 
     /**
@@ -120,15 +114,16 @@ public class SignService {
         AccessToken accessToken = providerService.getAccessToken(code, provider);
         ProfileDto profile = providerService.getProfile(accessToken.getAccess_token(), provider);
 
+        String refreshToken = jwtTokenProvider.createRefreshToken();
+        redisService.setDataWithExpiration(RedisKey.REGISTER.getKey() +refreshToken,refreshToken,JwtTokenProvider.refreshTokenValidTime);
+
         Optional<Member> findMember = memberRepository.findByEmailAndProvider(profile.getEmail(), provider);
         if (findMember.isPresent()) {
             Member member = findMember.get();
-            member.updateRefreshToken(jwtTokenProvider.createRefreshToken());
-            return new MemberLoginResponseDto(member.getId(), jwtTokenProvider.createToken(findMember.get().getEmail()), member.getRefreshToken());
+            return new MemberLoginResponseDto(member.getId(), jwtTokenProvider.createToken(findMember.get().getEmail()), refreshToken);
         } else {
             Member saveMember = saveMember(profile, provider);
-            saveMember.updateRefreshToken(jwtTokenProvider.createRefreshToken());
-            return new MemberLoginResponseDto(saveMember.getId(), jwtTokenProvider.createToken(saveMember.getEmail()), saveMember.getRefreshToken());
+            return new MemberLoginResponseDto(saveMember.getId(), jwtTokenProvider.createToken(saveMember.getEmail()), refreshToken);
         }
     }
 
@@ -148,25 +143,16 @@ public class SignService {
      * @return
      */
     @Transactional
-    public TokenResponseDto reIssue(TokenRequestDto requestDto) {
-        if (!jwtTokenProvider.validateTokenExpiration(requestDto.getRefreshToken()))
+    public TokenResponseDto reIssue(ReIssueRequestDto requestDto) {
+        String findRefreshToken = redisService.getData(RedisKey.REGISTER.getKey()+requestDto.getEmail());
+        if (findRefreshToken==null|| !findRefreshToken.equals(requestDto.getRefreshToken()))
             throw new InvalidRefreshTokenException();
 
-        Member member = findMemberByToken(requestDto);
-
-        if (!member.getRefreshToken().equals(requestDto.getRefreshToken()))
-            throw new InvalidRefreshTokenException();
-
+        Member member = memberRepository.findByEmail(requestDto.getEmail()).orElseThrow(MemberNotFoundException::new);
         String accessToken = jwtTokenProvider.createToken(member.getEmail());
         String refreshToken = jwtTokenProvider.createRefreshToken();
-        member.updateRefreshToken(refreshToken);
+        redisService.setDataWithExpiration(RedisKey.REGISTER.getKey()+member.getEmail(),refreshToken,JwtTokenProvider.refreshTokenValidTime);
         return new TokenResponseDto(accessToken, refreshToken);
     }
 
-    public Member findMemberByToken(TokenRequestDto requestDto) {
-        Authentication auth = jwtTokenProvider.getAuthentication(requestDto.getAccessToken());
-        UserDetails userDetails = (UserDetails) auth.getPrincipal();
-        String username = userDetails.getUsername();
-        return memberRepository.findByEmail(username).orElseThrow(MemberNotFoundException::new);
-    }
 }
